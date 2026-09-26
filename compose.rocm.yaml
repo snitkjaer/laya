@@ -1,0 +1,52 @@
+# Use with compose.yaml, and with compose.http.yaml when serving over HTTP. AMD/ROCm is
+# not part of the documented quickstart (docs/docker.md says CPU unless you configure and
+# validate another backend) - this override is local, hand-rolled for a ROCm host with
+# /dev/kfd and /dev/dri exposed. Validated on gfx1151 (Radeon 8060S / Strix Halo) with
+# kernel 7.2: the rocm7.2 wheels work; the rocm7.1 runtime segfaults creating a GPU queue.
+#
+# The rocm7.2 wheel ships gfx1151 kernels, so no HSA_OVERRIDE_GFX_VERSION is needed. On
+# other unsupported silicon pass it per run (e.g. -e HSA_OVERRIDE_GFX_VERSION=11.0.0); never
+# set it to an empty string, which the HSA runtime rejects and then reports no GPU at all.
+services:
+  laya:
+    build:
+      args:
+        TORCH_INDEX: "${LAYA_TORCH_INDEX:-rocm7.2}"
+        TORCH_VERSION: "${LAYA_TORCH_VERSION:-2.14.0}"
+    environment:
+      LAYA_DEVICE: "${LAYA_DEVICE:-cuda}"
+    devices:
+      - "/dev/kfd:/dev/kfd"
+      - "/dev/dri:/dev/dri"
+    # Numeric GIDs, not names: the container's /etc/group has no "render"/"video" entries,
+    # and `docker compose` needs a resolvable name or a bare number. These match this host's
+    # `getent group render video` (render=105, video=39) - check yours differs, the devices
+    # are also world-writable here so this is belt-and-suspenders rather than load-bearing.
+    group_add:
+      - "105"
+      - "39"
+    ipc: host
+    security_opt:
+      - seccomp=unconfined
+    cap_add:
+      - SYS_PTRACE
+
+  laya-serve:
+    build:
+      context: .
+      args:
+        TORCH_INDEX: "${LAYA_TORCH_INDEX:-rocm7.2}"
+        TORCH_VERSION: "${LAYA_TORCH_VERSION:-2.14.0}"
+    environment:
+      LAYA_DEVICE: "${LAYA_DEVICE:-cuda}"
+    devices:
+      - "/dev/kfd:/dev/kfd"
+      - "/dev/dri:/dev/dri"
+    group_add:
+      - "105"
+      - "39"
+    ipc: host
+    security_opt:
+      - seccomp=unconfined
+    cap_add:
+      - SYS_PTRACE
