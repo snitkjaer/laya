@@ -5,6 +5,14 @@ machine on the LAN. For the full Docker guide see [docs/docker.md](../docs/docke
 
 ## 1. Start the server
 
+`compose.rocm.yaml` needs the host's `render` and `video` group IDs, which differ between
+hosts. Export them once per shell before any of the commands below (`down` included):
+
+```bash
+export LAYA_RENDER_GID=$(getent group render | cut -d: -f3)
+export LAYA_VIDEO_GID=$(getent group video | cut -d: -f3)
+```
+
 Local only (published on `127.0.0.1:8000`, no auth):
 
 ```bash

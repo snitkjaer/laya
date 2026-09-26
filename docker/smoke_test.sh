@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Curl smoke test for a running `laya-serve` (see compose.http.yaml / docs/docker.md).
 #
+#   export LAYA_RENDER_GID=$(getent group render | cut -d: -f3) LAYA_VIDEO_GID=$(getent group video | cut -d: -f3)
 #   docker compose -f compose.yaml -f compose.http.yaml -f compose.rocm.yaml up -d --build --wait laya-serve
 #   docker/smoke_test.sh                      # or LAYA_URL=http://host:8000 docker/smoke_test.sh
 #

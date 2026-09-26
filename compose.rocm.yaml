@@ -19,12 +19,13 @@ services:
       - "/dev/kfd:/dev/kfd"
       - "/dev/dri:/dev/dri"
     # Numeric GIDs, not names: the container's /etc/group has no "render"/"video" entries,
-    # and `docker compose` needs a resolvable name or a bare number. These match this host's
-    # `getent group render video` (render=105, video=39) - check yours differs, the devices
-    # are also world-writable here so this is belt-and-suspenders rather than load-bearing.
+    # so Docker cannot resolve the names. The numbers differ between hosts, so they are
+    # required rather than defaulted; look them up when you run compose:
+    #   export LAYA_RENDER_GID=$(getent group render | cut -d: -f3)
+    #   export LAYA_VIDEO_GID=$(getent group video | cut -d: -f3)
     group_add:
-      - "105"
-      - "39"
+      - "${LAYA_RENDER_GID:?Set LAYA_RENDER_GID, e.g. export LAYA_RENDER_GID=$$(getent group render | cut -d: -f3)}"
+      - "${LAYA_VIDEO_GID:?Set LAYA_VIDEO_GID, e.g. export LAYA_VIDEO_GID=$$(getent group video | cut -d: -f3)}"
     ipc: host
     security_opt:
       - seccomp=unconfined
@@ -43,8 +44,8 @@ services:
       - "/dev/kfd:/dev/kfd"
       - "/dev/dri:/dev/dri"
     group_add:
-      - "105"
-      - "39"
+      - "${LAYA_RENDER_GID:?Set LAYA_RENDER_GID, e.g. export LAYA_RENDER_GID=$$(getent group render | cut -d: -f3)}"
+      - "${LAYA_VIDEO_GID:?Set LAYA_VIDEO_GID, e.g. export LAYA_VIDEO_GID=$$(getent group video | cut -d: -f3)}"
     ipc: host
     security_opt:
       - seccomp=unconfined
