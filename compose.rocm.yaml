@@ -1,43 +1,33 @@
-# Use with compose.yaml, and with compose.http.yaml when serving over HTTP. AMD/ROCm is
-# not part of the documented quickstart (docs/docker.md says CPU unless you configure and
-# validate another backend) - this override is local, hand-rolled for a ROCm host with
-# /dev/kfd and /dev/dri exposed. Validated on gfx1151 (Radeon 8060S / Strix Halo) with
-# kernel 7.2: the rocm7.2 wheels work; the rocm7.1 runtime segfaults creating a GPU queue.
+# Use with compose.yaml, and with compose.http.yaml when serving over HTTP. The
+# `laya-serve` entry repeats the ROCm build args and devices because it is a separate
+# service: overrides for `laya` never reach it, so it would serve on CPU.
 #
-# The rocm7.2 wheel ships gfx1151 kernels, so no HSA_OVERRIDE_GFX_VERSION is needed. On
-# other unsupported silicon pass it per run (e.g. -e HSA_OVERRIDE_GFX_VERSION=11.0.0); never
-# set it to an empty string, which the HSA runtime rejects and then reports no GPU at all.
+# ROCm PyTorch exposes AMD GPUs through the `cuda` device type, so LAYA_DEVICE stays
+# `cuda`. The container needs /dev/kfd and /dev/dri plus the host's render and video
+# groups. Docker resolves group names inside the image, which has neither, so pass the
+# host's numeric IDs (they differ between distributions):
+#
+#   export LAYA_RENDER_GID=$(getent group render | cut -d: -f3)
+#   export LAYA_VIDEO_GID=$(getent group video | cut -d: -f3)
 services:
   laya:
     build:
       args:
         TORCH_INDEX: "${LAYA_TORCH_INDEX:-rocm7.2}"
-        TORCH_VERSION: "${LAYA_TORCH_VERSION:-2.14.0}"
     environment:
       LAYA_DEVICE: "${LAYA_DEVICE:-cuda}"
     devices:
       - "/dev/kfd:/dev/kfd"
       - "/dev/dri:/dev/dri"
-    # Numeric GIDs, not names: the container's /etc/group has no "render"/"video" entries,
-    # so Docker cannot resolve the names. The numbers differ between hosts, so they are
-    # required rather than defaulted; look them up when you run compose:
-    #   export LAYA_RENDER_GID=$(getent group render | cut -d: -f3)
-    #   export LAYA_VIDEO_GID=$(getent group video | cut -d: -f3)
     group_add:
       - "${LAYA_RENDER_GID:?Set LAYA_RENDER_GID, e.g. export LAYA_RENDER_GID=$$(getent group render | cut -d: -f3)}"
       - "${LAYA_VIDEO_GID:?Set LAYA_VIDEO_GID, e.g. export LAYA_VIDEO_GID=$$(getent group video | cut -d: -f3)}"
-    ipc: host
-    security_opt:
-      - seccomp=unconfined
-    cap_add:
-      - SYS_PTRACE
 
   laya-serve:
     build:
       context: .
       args:
         TORCH_INDEX: "${LAYA_TORCH_INDEX:-rocm7.2}"
-        TORCH_VERSION: "${LAYA_TORCH_VERSION:-2.14.0}"
     environment:
       LAYA_DEVICE: "${LAYA_DEVICE:-cuda}"
     devices:
@@ -46,8 +36,3 @@ services:
     group_add:
       - "${LAYA_RENDER_GID:?Set LAYA_RENDER_GID, e.g. export LAYA_RENDER_GID=$$(getent group render | cut -d: -f3)}"
       - "${LAYA_VIDEO_GID:?Set LAYA_VIDEO_GID, e.g. export LAYA_VIDEO_GID=$$(getent group video | cut -d: -f3)}"
-    ipc: host
-    security_opt:
-      - seccomp=unconfined
-    cap_add:
-      - SYS_PTRACE

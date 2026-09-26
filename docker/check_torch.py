@@ -67,7 +67,7 @@ def main():
         actual = "cpu"
     if actual != expected:
         raise RuntimeError(f"Expected {expected} PyTorch, installed {actual}")
-    if actual not in ("cpu",) and not actual.startswith("rocm"):
+    if actual.startswith("cu"):
         from torch.backends import cusparselt
         if not cusparselt.is_available():
             raise RuntimeError("CUDA build is missing cuSPARSELt")

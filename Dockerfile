@@ -15,9 +15,9 @@ ENV PATH="/opt/venv/bin:$PATH"
 RUN apt-get update && apt-get install -y --no-install-recommends libatomic1 \
     && rm -rf /var/lib/apt/lists/*
 
-# CPU by default on AMD64 and ARM64. The CUDA override selects cu128 and the
-# DGX Spark override selects cu130. Bump TORCH_VERSION deliberately; the check
-# below fails the build if the wheel does not match the requested index.
+# CPU by default on AMD64 and ARM64. The CUDA override selects cu128, the ROCm
+# override rocm7.2 and the DGX Spark override cu130. Bump TORCH_VERSION deliberately;
+# the check below fails the build if the wheel does not match the requested index.
 ARG TORCH_INDEX=cpu
 ARG TORCH_VERSION=2.14.0
 COPY docker/check_torch.py /opt/check_torch.py
