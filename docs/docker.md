@@ -55,9 +55,39 @@ request (#365). The stock kernels give the same answers at the same latency. Set
 variable on a bare-metal install if `predict` fails with `Failed to find C compiler`.
 
 This uses [Compose GPU reservations](https://docs.docker.com/compose/how-tos/gpu-support/).
-Windows requires Docker Desktop's supported WSL2 GPU setup. Apple MPS,
-AMD/ROCm and Intel GPU containers are outside this quickstart; use CPU unless
-you configure and validate another backend.
+Windows requires Docker Desktop's supported WSL2 GPU setup. Apple MPS and
+Intel GPU containers are outside this quickstart; use CPU unless you configure
+and validate another backend.
+
+## AMD GPU / ROCm
+
+Linux hosts only. The host needs the in-kernel `amdgpu` driver, which provides
+`/dev/kfd` and `/dev/dri`; it does not need a ROCm install, because the PyTorch
+ROCm 7.2 wheel bundles its runtime. That wheel makes the image about 22 GB, against
+1.7 GB for CPU. Check your GPU against
+[ROCm's supported GPUs](https://rocm.docs.amd.com/projects/install-on-linux/en/latest/reference/system-requirements.html).
+WSL2 has no `/dev/kfd`, so this override does not work there.
+
+The container joins the host's `render` and `video` groups to open the devices. Their
+numeric IDs differ between distributions, so export them first:
+
+```bash
+export LAYA_RENDER_GID=$(getent group render | cut -d: -f3)
+export LAYA_VIDEO_GID=$(getent group video | cut -d: -f3)
+docker compose -f compose.yaml -f compose.rocm.yaml run --build --rm laya
+```
+
+ROCm PyTorch exposes AMD GPUs through the `cuda` device type, so the override defaults
+to `LAYA_DEVICE=cuda` and the CUDA check above works unchanged with
+`-f compose.rocm.yaml`. For a GPU the wheel ships no kernels for, set
+`HSA_OVERRIDE_GFX_VERSION` (for example `11.0.0`) with `docker compose run -e`; never set
+it to an empty string, which the runtime rejects and then reports no GPU.
+
+Validated on a Radeon 8060S (gfx1151, Ryzen AI Max+ 395) with kernel 7.2. The ROCm 7.1
+wheel segfaults creating a GPU queue on that chip, so the override selects 7.2. Against
+the CPU image with 16 threads on the same machine, median latency for the bundled
+request fell from 189 ms to 31 ms, and from 1,075 ms to 97 ms for the same three
+questions over a 1,500-word document. Answers matched within 0.01.
 
 ## Configuration
 
@@ -79,7 +109,8 @@ work with `docker run -e`; Compose-only settings are identified below.
 | `HF_HOME` | `/home/laya/.cache/huggingface` | Cache path; see mount requirement below |
 | `LAYA_CACHE_VOLUME` | project model cache | **Compose only:** named cache volume |
 | `LAYA_GPU_ID` | `0` | **Compose only:** NVIDIA device index or UUID |
-| `LAYA_TORCH_INDEX` | `cpu` / `cu128` / `cu130` | **Compose build:** PyTorch wheel index |
+| `LAYA_RENDER_GID` / `LAYA_VIDEO_GID` | required with ROCm | **Compose only:** host `render` / `video` group IDs |
+| `LAYA_TORCH_INDEX` | `cpu` / `cu128` / `cu130` / `rocm7.2` | **Compose build:** PyTorch wheel index |
 | `LAYA_TORCH_VERSION` | `2.14.0` | **Compose build:** pinned PyTorch version |
 
 Compose forwards the runtime variables except `HF_HOME`, which stays aligned
@@ -198,6 +229,9 @@ never reach it:
 docker compose -f compose.yaml -f compose.http.yaml -f compose.cuda.yaml up --build laya-serve
 ```
 
+For AMD, use `-f compose.rocm.yaml` in place of `-f compose.cuda.yaml`, with the group IDs
+exported as in [AMD GPU / ROCm](#amd-gpu-rocm).
+
 `up` keeps the service running in the foreground; `-d` detaches. Weights go to the same
 named `model-cache` volume as the quickstart, so serving after a quickstart run starts
 with the checkpoints already on disk. Stop with `docker compose ... down`, using the same
@@ -211,6 +245,15 @@ The port is published on `127.0.0.1` only. The API has no authentication until
 The service has a healthcheck on `/health`. The server preloads before it starts
 listening, so with `LAYA_PRELOAD=1` a healthy container has its checkpoints loaded.
 `docker compose ... up -d --wait laya-serve` returns once it is healthy.
+
+[`docker/smoke_test.sh`](https://github.com/NandhaKishorM/laya/blob/main/docker/smoke_test.sh)
+checks a running server with curl and jq: `/health`, a `noul` request, the bundled
+request and 4xx on bad input. It reads `LAYA_URL`, `LAYA_API_KEY` and, to assert the
+reported device, `EXPECT_DEVICE`:
+
+```bash
+EXPECT_DEVICE=cuda docker/smoke_test.sh
+```
 
 ### Server configuration
 
