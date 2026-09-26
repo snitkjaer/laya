@@ -59,10 +59,15 @@ def main():
     import torch
 
     expected = sys.argv[1]
-    actual = "cpu" if torch.version.cuda is None else "cu" + torch.version.cuda.replace(".", "")
+    if torch.version.hip is not None:
+        actual = "rocm" + ".".join(torch.version.hip.split(".")[:2])
+    elif torch.version.cuda is not None:
+        actual = "cu" + torch.version.cuda.replace(".", "")
+    else:
+        actual = "cpu"
     if actual != expected:
         raise RuntimeError(f"Expected {expected} PyTorch, installed {actual}")
-    if actual != "cpu":
+    if actual not in ("cpu",) and not actual.startswith("rocm"):
         from torch.backends import cusparselt
         if not cusparselt.is_available():
             raise RuntimeError("CUDA build is missing cuSPARSELt")

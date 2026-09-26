@@ -9,6 +9,12 @@ ENV PIP_NO_CACHE_DIR=1 \
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
+# libatomic1 is missing from python:3.11-slim-bookworm; the ROCm torch wheel's C++
+# extension needs it just to import, so the build stage's own import-and-check step
+# below fails without it. Harmless to install unconditionally for CPU/CUDA too.
+RUN apt-get update && apt-get install -y --no-install-recommends libatomic1 \
+    && rm -rf /var/lib/apt/lists/*
+
 # CPU by default on AMD64 and ARM64. The CUDA override selects cu128 and the
 # DGX Spark override selects cu130. Bump TORCH_VERSION deliberately; the check
 # below fails the build if the wheel does not match the requested index.
@@ -47,6 +53,14 @@ ENV PATH="/opt/venv/bin:$PATH" \
     OMP_NUM_THREADS=4 \
     LAYA_DEVICE=cpu \
     HF_HOME=/home/laya/.cache/huggingface
+
+# libatomic1/libnuma1/libelf1/libdrm2/libdrm-amdgpu1 are the small system libs the ROCm
+# PyTorch wheel needs at runtime beyond what it bundles (import itself, plus kfd/drm ioctl
+# access). Harmless on CPU/CUDA builds, so they stay in the shared runtime stage rather
+# than a ROCm-only one.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libatomic1 libnuma1 libelf1 libdrm2 libdrm-amdgpu1 \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd --gid 10001 laya \
     && useradd --uid 10001 --gid laya --create-home laya \
