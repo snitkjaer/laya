@@ -86,8 +86,11 @@ it to an empty string, which the runtime rejects and then reports no GPU.
 Validated on a Radeon 8060S (gfx1151, Ryzen AI Max+ 395) with kernel 7.2. The ROCm 7.1
 wheel segfaults creating a GPU queue on that chip, so the override selects 7.2. Against
 the CPU image with 16 threads on the same machine, median latency for the bundled
-request fell from 189 ms to 31 ms, and from 1,075 ms to 97 ms for the same three
-questions over a 1,500-word document. Answers matched within 0.01.
+request fell from 184 ms to 31 ms, and from 1,085 ms to 99 ms for the same three
+questions over a 1,500-word document. Answers matched within 0.01. See the
+[full results](https://github.com/NandhaKishorM/laya/blob/main/docker/benchmark-results.md);
+[`docker/benchmark.py`](https://github.com/NandhaKishorM/laya/blob/main/docker/benchmark.py)
+compares any two running servers and fails if their answers disagree.
 
 ## Configuration
 
